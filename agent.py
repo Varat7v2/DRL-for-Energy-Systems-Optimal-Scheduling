@@ -175,7 +175,7 @@ class AgentSAC(AgentBase):
         for _ in range(target_step):
             action = self.select_action(state)
             
-            state,next_state, reward, done, = env.step(action)
+            state, next_state, reward, done, = env.step(action)
 
             trajectory.append((state, (reward, done, *action)))
             state = env.reset() if done else next_state

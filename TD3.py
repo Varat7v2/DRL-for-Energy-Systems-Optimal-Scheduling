@@ -10,7 +10,7 @@ from plotDRL import plot_optimization_result
 from random_generator_battery import ESSEnv
 import pandas as pd 
 
-from tools import Arguments,get_episode_return,test_one_episode,ReplayBuffer,optimization_base_result
+from tools import Arguments, get_episode_return, test_one_episode, ReplayBuffer, optimization_base_result
 from agent import AgentTD3
 from random_generator_battery import ESSEnv
 def update_buffer(_trajectory):
@@ -89,8 +89,7 @@ if __name__=='__main__':
                         episode_reward, episode_unbalance = get_episode_return(env, agent.act, agent.device)
                         reward_record['mean_episode_reward'].append(episode_reward)
                         reward_record['unbalance'].append(episode_unbalance)
-                    print(
-                        f'curren epsiode is {i_episode}, reward:{episode_reward},unbalance:{episode_unbalance},buffer_length: {buffer.now_len}')
+                    print(f'curren epsiode is {i_episode}, reward:{episode_reward},unbalance:{episode_unbalance},buffer_length: {buffer.now_len}')
                     if i_episode % 10 == 0:
                         # target_step
                         with torch.no_grad():
@@ -130,8 +129,7 @@ if __name__=='__main__':
         base_result = optimization_base_result(env, month, day, initial_soc)
     if args.plot_on:
         # from plotDRL import PlotArgs,make_dir,plot_reward,plot_evaluation_information,plot_loss,plot_pyomo_information
-        from plotDRL import PlotArgs, make_dir,plot_evaluation_information,\
-            plot_optimization_result
+        from plotDRL import PlotArgs, make_dir, plot_evaluation_information, plot_optimization_result
         plot_args = PlotArgs()
         plot_args.feature_change = ''
         args.cwd = agent_name  # change

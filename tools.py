@@ -7,92 +7,94 @@ from pyomo.core.base.config import default_pyomo_config
 from pyomo.core.base.piecewise import Bound
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
-import gurobipy as gp
-from gurobipy import GRB
-from gurobipy import *
-def optimization_base_result(env,month,day,initial_soc):
+# import gurobipy as gp
+# from gurobipy import GRB
+# from gurobipy import *
 
-    pv=env.data_manager.get_series_pv_data(month,day)
-    price=env.data_manager.get_series_price_data(month,day)
-    load=env.data_manager.get_series_electricity_cons_data(month,day)
-    period=env.episode_length
-# parameters
-    DG_parameters=env.dg_parameters
-    def get_dg_info(parameters):
-        p_max=[]
-        p_min=[]
-        ramping_up=[]
-        ramping_down=[]
-        a_para=[]
-        b_para=[]
-        c_para=[]
+# def optimization_base_result(env, month, day, initial_soc):
+#
+#     pv=env.data_manager.get_series_pv_data(month,day)
+#     price=env.data_manager.get_series_price_data(month,day)
+#     load=env.data_manager.get_series_electricity_cons_data(month,day)
+#     period=env.episode_length
+# # parameters
+#     DG_parameters=env.dg_parameters
+#     def get_dg_info(parameters):
+#         p_max=[]
+#         p_min=[]
+#         ramping_up=[]
+#         ramping_down=[]
+#         a_para=[]
+#         b_para=[]
+#         c_para=[]
+#
+#         for name, gen_info in parameters.items():
+#             p_max.append(gen_info['power_output_max'])
+#             p_min.append(gen_info['power_output_min'])
+#             ramping_up.append(gen_info['ramping_up'])
+#             ramping_down.append(gen_info['ramping_down'])
+#             a_para.append(gen_info['a'])
+#             b_para.append(gen_info['b'])
+#             c_para.append(gen_info['c'])
+#         return p_max,p_min,ramping_up,ramping_down,a_para,b_para,c_para
+#     p_max,p_min,ramping_up,ramping_down,a_para,b_para,c_para=get_dg_info(parameters=DG_parameters)
+#     battery_parameters=env.battery_parameters
+#     NUM_GEN=len(DG_parameters.keys())
+#     battery_capacity=env.battery.capacity
+#     battery_efficiency=env.battery.efficiency
+#
+#
+#     m=gp.Model("UC")
+#
+#     #set variables in the system
+#     on_off=m.addVars(NUM_GEN,period,vtype=GRB.BINARY,name='on_off')
+#     gen_output=m.addVars(NUM_GEN,period,vtype=GRB.CONTINUOUS,name='output')
+#     battery_energy_change=m.addVars(period,vtype=GRB.CONTINUOUS,lb=-env.battery.max_charge,ub=env.battery.max_charge,name='battery_action')#directly set constrains for charge/discharge
+#     grid_energy_import=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0,ub=env.grid.exchange_ability,name='import')# set constrains for exchange between external grid and distributed energy system
+#     grid_energy_export=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0,ub=env.grid.exchange_ability,name='export')
+#     soc=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0.2,ub=0.8,name='SOC')
+#
+#     #1. add balance constrain
+#     m.addConstrs(((sum(gen_output[g,t] for g in range(NUM_GEN))+pv[t]+grid_energy_import[t]>=load[t]+battery_energy_change[t]+grid_energy_export[t]) for t in range(period)),name='powerbalance')
+#     #2. add constrain for p max pmin
+#     m.addConstrs((gen_output[g,t]<=on_off[g,t]*p_max[g] for g in range(NUM_GEN) for t in range(period)),'output_max')
+#     m.addConstrs((gen_output[g,t]>=on_off[g,t]*p_min[g]for g in range(NUM_GEN) for t in range(period)),'output_min')
+#     #3. add constrain for ramping up ramping down
+#     m.addConstrs((gen_output[g,t+1]-gen_output[g,t]<=ramping_up[g] for g in range(NUM_GEN) for t in range(period-1)),'ramping_up')
+#     m.addConstrs((gen_output[g,t]-gen_output[g,t+1]<=ramping_down[g] for g in range(NUM_GEN) for t in range(period-1)),'ramping_down')
+#     #4. add constrains for SOC
+#     m.addConstr(battery_capacity*soc[0]==battery_capacity*initial_soc+(battery_energy_change[0]*battery_efficiency),name='soc0')
+#     m.addConstrs((battery_capacity*soc[t]==battery_capacity*soc[t-1]+(battery_energy_change[t]*battery_efficiency)for t in range(1,period)),name='soc update')
+#
+#     # set cost function
+#     #1 cost of generator
+#     cost_gen=gp.quicksum((a_para[g]*gen_output[g,t]*gen_output[g,t]+b_para[g]*gen_output[g,t]+c_para[g]*on_off[g,t])for t in range(period) for g in range(NUM_GEN))
+#     cost_grid_import=gp.quicksum(grid_energy_import[t]*price[t] for t in range(period))
+#     cost_grid_export=gp.quicksum(grid_energy_export[t]*price[t]*env.sell_coefficient for t in range(period))
+#
+#     m.setObjective((cost_gen+cost_grid_import-cost_grid_export),GRB.MINIMIZE)
+#     m.optimize()
+#     output_record={'pv':[],'price':[],'load':[],'netload':[],'soc':[],'battery_energy_change':[],'grid_import':[],'grid_export':[],'gen1':[],'gen2':[],'gen3':[],'step_cost':[]}
+#     for t in range(period):
+#         gen_cost=sum((on_off[g,t].x*(a_para[g]*gen_output[g,t].x*gen_output[g,t].x+b_para[g]*gen_output[g,t].x+c_para[g])) for g in range(NUM_GEN))
+#         grid_import_cost=grid_energy_import[t].x*price[t]
+#         grid_export_cost=grid_energy_export[t].x*price[t]*env.sell_coefficient
+#         output_record['pv'].append(pv[t])
+#         output_record['price'].append(price[t])
+#         output_record['load'].append(load[t])
+#         output_record['netload'].append(load[t]-pv[t])
+#         output_record['soc'].append(soc[t].x)
+#         output_record['battery_energy_change'].append(battery_energy_change[t].x)
+#         output_record['grid_import'].append(grid_energy_import[t].x)
+#         output_record['grid_export'].append(grid_energy_export[t].x)
+#         output_record['gen1'].append(gen_output[0,t].x)
+#         output_record['gen2'].append(gen_output[1,t].x)
+#         output_record['gen3'].append(gen_output[2,t].x)
+#         output_record['step_cost'].append(gen_cost+grid_import_cost-grid_export_cost)
+#
+#     output_record_df = pd.DataFrame.from_dict(output_record)
+#     return output_record_df
 
-        for name, gen_info in parameters.items():
-            p_max.append(gen_info['power_output_max'])
-            p_min.append(gen_info['power_output_min'])
-            ramping_up.append(gen_info['ramping_up'])
-            ramping_down.append(gen_info['ramping_down'])
-            a_para.append(gen_info['a'])
-            b_para.append(gen_info['b'])
-            c_para.append(gen_info['c'])
-        return p_max,p_min,ramping_up,ramping_down,a_para,b_para,c_para
-    p_max,p_min,ramping_up,ramping_down,a_para,b_para,c_para=get_dg_info(parameters=DG_parameters)
-    battery_parameters=env.battery_parameters
-    NUM_GEN=len(DG_parameters.keys())
-    battery_capacity=env.battery.capacity
-    battery_efficiency=env.battery.efficiency
-
-
-    m=gp.Model("UC")
-
-    #set variables in the system
-    on_off=m.addVars(NUM_GEN,period,vtype=GRB.BINARY,name='on_off')
-    gen_output=m.addVars(NUM_GEN,period,vtype=GRB.CONTINUOUS,name='output')
-    battery_energy_change=m.addVars(period,vtype=GRB.CONTINUOUS,lb=-env.battery.max_charge,ub=env.battery.max_charge,name='battery_action')#directly set constrains for charge/discharge
-    grid_energy_import=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0,ub=env.grid.exchange_ability,name='import')# set constrains for exchange between external grid and distributed energy system
-    grid_energy_export=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0,ub=env.grid.exchange_ability,name='export')
-    soc=m.addVars(period,vtype=GRB.CONTINUOUS,lb=0.2,ub=0.8,name='SOC')
-
-    #1. add balance constrain
-    m.addConstrs(((sum(gen_output[g,t] for g in range(NUM_GEN))+pv[t]+grid_energy_import[t]>=load[t]+battery_energy_change[t]+grid_energy_export[t]) for t in range(period)),name='powerbalance')
-    #2. add constrain for p max pmin
-    m.addConstrs((gen_output[g,t]<=on_off[g,t]*p_max[g] for g in range(NUM_GEN) for t in range(period)),'output_max')
-    m.addConstrs((gen_output[g,t]>=on_off[g,t]*p_min[g]for g in range(NUM_GEN) for t in range(period)),'output_min')
-    #3. add constrain for ramping up ramping down
-    m.addConstrs((gen_output[g,t+1]-gen_output[g,t]<=ramping_up[g] for g in range(NUM_GEN) for t in range(period-1)),'ramping_up')
-    m.addConstrs((gen_output[g,t]-gen_output[g,t+1]<=ramping_down[g] for g in range(NUM_GEN) for t in range(period-1)),'ramping_down')
-    #4. add constrains for SOC
-    m.addConstr(battery_capacity*soc[0]==battery_capacity*initial_soc+(battery_energy_change[0]*battery_efficiency),name='soc0')
-    m.addConstrs((battery_capacity*soc[t]==battery_capacity*soc[t-1]+(battery_energy_change[t]*battery_efficiency)for t in range(1,period)),name='soc update')
-
-    # set cost function
-    #1 cost of generator
-    cost_gen=gp.quicksum((a_para[g]*gen_output[g,t]*gen_output[g,t]+b_para[g]*gen_output[g,t]+c_para[g]*on_off[g,t])for t in range(period) for g in range(NUM_GEN))
-    cost_grid_import=gp.quicksum(grid_energy_import[t]*price[t] for t in range(period))
-    cost_grid_export=gp.quicksum(grid_energy_export[t]*price[t]*env.sell_coefficient for t in range(period))
-
-    m.setObjective((cost_gen+cost_grid_import-cost_grid_export),GRB.MINIMIZE)
-    m.optimize()
-    output_record={'pv':[],'price':[],'load':[],'netload':[],'soc':[],'battery_energy_change':[],'grid_import':[],'grid_export':[],'gen1':[],'gen2':[],'gen3':[],'step_cost':[]}
-    for t in range(period):
-        gen_cost=sum((on_off[g,t].x*(a_para[g]*gen_output[g,t].x*gen_output[g,t].x+b_para[g]*gen_output[g,t].x+c_para[g])) for g in range(NUM_GEN))
-        grid_import_cost=grid_energy_import[t].x*price[t]
-        grid_export_cost=grid_energy_export[t].x*price[t]*env.sell_coefficient
-        output_record['pv'].append(pv[t])
-        output_record['price'].append(price[t])
-        output_record['load'].append(load[t])
-        output_record['netload'].append(load[t]-pv[t])
-        output_record['soc'].append(soc[t].x)
-        output_record['battery_energy_change'].append(battery_energy_change[t].x)
-        output_record['grid_import'].append(grid_energy_import[t].x)
-        output_record['grid_export'].append(grid_energy_export[t].x)
-        output_record['gen1'].append(gen_output[0,t].x)
-        output_record['gen2'].append(gen_output[1,t].x)
-        output_record['gen3'].append(gen_output[2,t].x)
-        output_record['step_cost'].append(gen_cost+grid_import_cost-grid_export_cost)
-
-    output_record_df = pd.DataFrame.from_dict(output_record)
-    return output_record_df
 class Arguments:
     '''revise here for our own purpose'''
     def __init__(self, agent=None, env=None):
@@ -107,7 +109,7 @@ class Arguments:
         self.num_threads = 8  # cpu_num for evaluate model, torch.set_num_threads(self.num_threads)
 
         '''Arguments for training'''
-        self.num_episode=2000
+        self.num_episode = 2      # 2000
         self.gamma = 0.995  # discount factor of future rewards
         # self.reward_scale = 1  # an approximate target reward usually be closed to 256
         self.learning_rate = 2 ** -14  # 2 ** -14 ~= 6e-5
@@ -125,13 +127,14 @@ class Arguments:
         # self.eval_times = 2  # number of times that get episode return in first
         self.random_seed = 0  # initialize random seed in self.init_before_training()
         self.random_seed_list=[1234,2234,3234,4234,5234]
+
         '''Arguments for save and plot issues'''
-        self.train=True
-        self.save_network=True
-        self.test_network=True
-        self.save_test_data=True
-        self.compare_with_pyomo=True
-        self.plot_on=True 
+        self.train = True
+        self.save_network = True
+        self.test_network = True
+        self.save_test_data = True
+        self.compare_with_pyomo = True
+        self.plot_on = True
 
     def init_before_training(self, if_main):
         if self.cwd is None:
@@ -152,7 +155,7 @@ class Arguments:
         torch.set_num_threads(self.num_threads)
         torch.set_default_dtype(torch.float32)
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.visible_gpu)# control how many GPU is used 　
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.visible_gpu)      # control how many GPU is used 　
 def test_one_episode(env, act, device):
     '''to get evaluate information, here record the unblance of after taking action'''
     record_state=[]
@@ -188,21 +191,23 @@ def test_one_episode(env, act, device):
     record_system_info[-1][5]=env.final_step_outputs[3]
     record={'init_info':record_init_info,'information':record_system_info,'state':record_state,'action':record_action,'reward':record_reward,'cost':record_cost,'unbalance':record_unbalance,'record_output':record_output}
     return record
+
 def get_episode_return(env, act, device):
     episode_return = 0.0  # sum of rewards in an episode
-    episode_unbalance=0.0
+    episode_unbalance = 0.0
     state = env.reset()
     for i in range(24):
         s_tensor = torch.as_tensor((state,), device=device)
         a_tensor = act(s_tensor)
         action = a_tensor.detach().cpu().numpy()[0]  # not need detach(), because with torch.no_grad() outside
-        state, next_state, reward, done,= env.step(action)
-        state=next_state
+        state, next_state, reward, done = env.step(action)
+        state = next_state
         episode_return += reward
-        episode_unbalance+=env.real_unbalance
+        episode_unbalance += env.real_unbalance
         if done:
             break
-    return episode_return,episode_unbalance
+    return episode_return, episode_unbalance
+
 class ReplayBuffer:
     def __init__(self, max_len, state_dim, action_dim, gpu_id=0):
         self.now_len = 0
@@ -213,7 +218,7 @@ class ReplayBuffer:
         self.action_dim = action_dim
         self.device = torch.device(f"cuda:{gpu_id}" if (torch.cuda.is_available() and (gpu_id >= 0)) else "cpu")
 
-        other_dim = 1 + 1 + self.action_dim
+        other_dim = 1 + 1 + self.action_dim     # 1+1 for done reward and done flag
         self.buf_other = torch.empty(size=(max_len, other_dim), dtype=self.data_type, device=self.device)
 
         if isinstance(state_dim, int):  # state is pixel
